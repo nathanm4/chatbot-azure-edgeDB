@@ -66,22 +66,29 @@ def parse(tables):
 
 def select_relevant_schemas(state: dict, config: dict) -> dict:
     db = config["configurable"]["db"]
+
+    all_tables = list(db.get_usable_table_names())
+    print("DEBUG — Available tables:", all_tables)
+
+    # Sample just 25 table names to stay under token limit
+    limited_tables = all_tables[:25]
+    print("DEBUG — Limiting to first 25 tables:", limited_tables)
+
     state['max_attempts'] = state.get('max_attempts', MAX_ATTEMPTS_DEFAULT)
-    table_names = db.get_usable_table_names()
     question = state['question']
 
-    toolkit = SQLDatabaseToolkit(db=db, llm=ChatGroq(model="llama-3.1-8b-instant"))
-    tools = toolkit.get_tools()
-    get_schema_tool = next(tool for tool in tools if tool.name == "sql_db_schema")
-    tables_with_schema = {i: get_schema_tool.invoke(i) for i in table_names}
-
-    instruction = SystemMessage(
-        content=SELECT_RELEVANT_TABLES_INSTRUCTION.format(table_names=table_names)
-    )
+    instruction = SystemMessage(content=SELECT_RELEVANT_TABLES_INSTRUCTION.format(table_names=limited_tables))
     prompt = [instruction, HumanMessage(content=question)]
     model = ChatGroq(model="llama-3.1-8b-instant")
-    relevant_tables = model.invoke(prompt)
-    relevant_tables = parse(relevant_tables.content)
+
+    try:
+        relevant_tables_raw = model.invoke(prompt).content
+        relevant_tables = ast.literal_eval(relevant_tables_raw)
+        # Filter out invalid tables
+        relevant_tables = [t for t in relevant_tables if t in limited_tables]
+    except Exception as e:
+        print("Error parsing relevant tables:", e)
+        relevant_tables = []
 
     if not relevant_tables:
         return {
@@ -102,6 +109,8 @@ def select_relevant_schemas(state: dict, config: dict) -> dict:
         'reasoning': '',
         'queries': []
     }
+
+
 
 def generate_query(state: dict, config: dict) -> dict:
     db = config["configurable"]["db"]
