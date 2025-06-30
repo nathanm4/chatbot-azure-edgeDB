@@ -1,9 +1,18 @@
-from nodes import *
+from nodes import (
+    select_relevant_schemas,
+    generate_query,
+    execute_query,
+    generate_answer,
+    general_chat,
+    check_question,
+    router,
+)
+from states import OverallState
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 def build_graph():
-    builder = StateGraph(state_schema=OverallState)  # ✅ FIXED
+    builder = StateGraph(state_schema=OverallState)
 
     builder.add_node(select_relevant_schemas)
     builder.add_node(generate_query)
